@@ -1,9 +1,7 @@
 package node
 
-class TreeNode<E : Comparable<E>>(data: E) {
-    var data: E = data
+abstract class TreeNode<T: Comparable<T>>(var key: T) {
 
-    var parent: TreeNode<E>? = null
-    var left: TreeNode<E>? = null
-    var right: TreeNode<E>? = null
+    var left: TreeNode<T>? = null
+    var right: TreeNode<T>? = null
 }
