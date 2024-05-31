@@ -6,7 +6,7 @@ import node.TreeNode
 class FineGrainedTree<T : Comparable<T>> : AbstractTree<T>() {
     private val mutex = Mutex()
 
-    private suspend fun searchNode(key: T): T? {
+    private suspend fun searchNode(key: T): TreeNode<T>? {
         var cur = root
         while (true) {
             // return null if root doesn't exist
@@ -15,7 +15,7 @@ class FineGrainedTree<T : Comparable<T>> : AbstractTree<T>() {
                 return null
             } else if (key == cur.key) {
                 cur.unlock()
-                return cur.key
+                return cur
             } else if (key < cur.key) {
                 val left = cur.left
                 left?.lock()
@@ -40,7 +40,7 @@ class FineGrainedTree<T : Comparable<T>> : AbstractTree<T>() {
             searchNode(key)
             mutex.unlock()
 
-            return searchNode(key)
+            return searchNode(key)?.key
         }
     }
 
@@ -62,7 +62,6 @@ class FineGrainedTree<T : Comparable<T>> : AbstractTree<T>() {
     }
 
     private suspend fun insertNode(key: T): TreeNode<T>? {
-
         var cur = root ?: throw IllegalStateException("case when the root is null is processed")
 
         while (true) {
@@ -99,69 +98,67 @@ class FineGrainedTree<T : Comparable<T>> : AbstractTree<T>() {
                     val parent = cur.parent
                     parent!!.unlock()
                 }
-                } else {
-                    return cur
-                }
+            } else {
+                return cur
+            }
         }
+    }
+
+    private fun getSuccessor(node: TreeNode<T>?): TreeNode<T>? {
+        var successorNode = node!!.left ?: throw Exception("node is expected to have 2 children")
+        while (successorNode.right != null) {
+            successorNode = successorNode.right ?: throw Exception("successor node is expected to have the right child")
+        }
+        return successorNode
+    }
+
+    private fun deleteNode(node: TreeNode<T>?) {
+        if (node!!.left == null && node.right == null) {
+            replaceNode(node, null)
+        }   else if (node.left == null || node.right == null) {
+            replaceNode(node, if (node.left == null) node.right else node.left)
+        }    else {
+            val successor = getSuccessor(node)
+            node.key = successor!!.key
+            deleteNode(successor)
+        }
+    }
+
+    private fun replaceNode(nodeToReplace: TreeNode<T>?, replacementNode: TreeNode<T>?) {
+        val parent = nodeToReplace!!.parent
+        if (parent == null) {
+            root = replacementNode
+        } else {
+            if (parent.left == nodeToReplace) {
+                parent.left = replacementNode
+            }
+            else {
+                parent.right = replacementNode
+            }
+        }
+        replacementNode?.parent = parent
     }
 
 
     override suspend fun delete(key: T): T? {
-       TODO()
-    }
-
-    private fun deleteNode(node: TreeNode<T>): TreeNode<T>? {
-        return when {
-            node.left == null && node.right == null ->
-                deleteLeafNode(node)
-
-            node.left == null || node.right == null ->
-                deleteNodeWithOneChild(node)
-
-            else -> deleteNodeWithTwoChildren(node)
-        }
-    }
-
-    private fun replaceChild(wasChild: TreeNode<T>, newChild: TreeNode<T>?) {
-        val parent = wasChild.parent
-        if (parent == null) {
-            root = newChild
-            parent?.unlock()
-        } else if (parent.left == wasChild) {
-            parent.left = newChild
-            parent.unlock()
+        mutex.lock()
+        if (root?.key == key) {
+            deleteNode(root!!)
+            mutex.unlock()
+            return root?.key
+        } else if (root != null) {
+            root?.lock()
+            mutex.unlock()
         } else {
-            parent.right = newChild
-            parent.unlock()
+            mutex.unlock()
+            return null
         }
-
-        newChild?.parent = wasChild.parent
-    }
-
-    private fun deleteLeafNode(node: TreeNode<T>): TreeNode<T> {
-        replaceChild(node, null)
-        return node
-    }
-
-    private fun deleteNodeWithOneChild(node: TreeNode<T>): TreeNode<T> {
-        val nodeToReplaceWith = if (node.left == null) node.right else node.left
-        replaceChild(node, nodeToReplaceWith)
-        return node
-    }
-
-    private fun findPredecessor(node: TreeNode<T>): TreeNode<T> {
-        var nodeToReplaceWith = node.left
-            ?: throw IllegalStateException("node must have two children")
-        while (nodeToReplaceWith.right != null) {
-            nodeToReplaceWith = nodeToReplaceWith.right
-                ?: throw IllegalStateException("nodeToReplaceWith must have right child")
+        val node = searchNode(key) ?: return null
+        if (node == root) {
+            deleteNode(node)
+            return node.key
         }
-        return nodeToReplaceWith
-    }
-
-    private fun deleteNodeWithTwoChildren(node: TreeNode<T>): TreeNode<T>? {
-        val nodePredecessor = findPredecessor(node)
-        node.key = nodePredecessor.key
-        return deleteNode(nodePredecessor)
+        deleteNode(node)
+        return node.key
     }
 }
