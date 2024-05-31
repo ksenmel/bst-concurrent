@@ -105,11 +105,11 @@ class FineGrainedTree<T : Comparable<T>> : AbstractTree<T>() {
     }
 
     private fun getSuccessor(node: TreeNode<T>?): TreeNode<T>? {
-        var successorNode = node!!.left ?: throw Exception("node is expected to have 2 children")
-        while (successorNode.right != null) {
-            successorNode = successorNode.right ?: throw Exception("successor node is expected to have the right child")
+        var successor = node!!.left ?: throw Exception("node is expected to have 2 children")
+        while (successor.right != null) {
+            successor = successor.right ?: throw Exception("successor node is expected to have the right child")
         }
-        return successorNode
+        return successor
     }
 
     private fun deleteNode(node: TreeNode<T>?) {

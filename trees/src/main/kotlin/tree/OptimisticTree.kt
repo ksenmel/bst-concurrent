@@ -106,8 +106,62 @@ class OptimisticTree<T : Comparable<T>> : AbstractTree<T>() {
         }
     }
 
+    private fun getSuccessor(node: TreeNode<T>?): TreeNode<T>? {
+        var successor = node!!.left ?: throw Exception("node is expected to have 2 children")
+        while (successor.right != null) {
+            successor = successor.right ?: throw Exception("successor node is expected to have the right child")
+        }
+        return successor
+    }
+
+    private fun deleteNode(node: TreeNode<T>?) {
+        if (node!!.left == null && node.right == null) {
+            replaceNode(node, null)
+        }   else if (node.left == null || node.right == null) {
+            replaceNode(node, if (node.left == null) node.right else node.left)
+        }    else {
+            val successor = getSuccessor(node)
+            node.key = successor!!.key
+            deleteNode(successor)
+        }
+    }
+
+    private fun replaceNode(nodeToReplace: TreeNode<T>?, replacementNode: TreeNode<T>?) {
+        val parent = nodeToReplace!!.parent
+        if (parent == null) {
+            root = replacementNode
+        } else {
+            if (parent.left == nodeToReplace) {
+                parent.left = replacementNode
+            }
+            else {
+                parent.right = replacementNode
+            }
+        }
+        replacementNode?.parent = parent
+    }
+
+
     override suspend fun delete(key: T): T? {
-        TODO()
+        mutex.lock()
+        if (root?.key == key) {
+            deleteNode(root!!)
+            mutex.unlock()
+            return root?.key
+        } else if (root != null) {
+            root?.lock()
+            mutex.unlock()
+        } else {
+            mutex.unlock()
+            return null
+        }
+        val node = searchNode(key) ?: return null
+        if (node == root) {
+            deleteNode(node)
+            return node.key
+        }
+        deleteNode(node)
+        return node.key
     }
 
 }
